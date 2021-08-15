@@ -1,0 +1,628 @@
+---
+title: "Analysis_root_phenotyping_survey"
+author: "Benjamin Delory"
+date: "31/07/2021"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+    fig_caption: TRUE
+    toc_depth: 4
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center")
+```
+
+## Load R packages
+
+```{r cars, message=FALSE, warning=FALSE}
+library(readxl)
+library(tidyverse)
+library(ggbeeswarm)
+library(ggpubr)
+```
+
+## Load survey data
+
+```{r}
+path<-"C:/Users/Delory/Documents/Postdoc/Conferences/ISRR_2021/Ambassador program"
+data <- read_excel(paste(path, "Root phenotyping survey.xlsx", sep="/"))
+```
+
+## Create summary figure for New Phytologist report
+
+### Panel A: Ecological habitats
+
+```{r}
+habitat<-na.omit(data$`With regard to root phenotyping, what ecological habitat(s) are you studying?`)
+
+n<-length(habitat)
+
+habitat<-data.frame(h=sort(unlist(str_split(habitat, pattern=";"))))
+
+habitat<-data.frame(h=str_remove(habitat$h, ".\\(.*"))
+
+habitat <- habitat %>% 
+  group_by(h) %>% 
+  mutate(count_name_occurr = n()) %>%
+  distinct(.keep_all=TRUE) %>%
+  arrange(count_name_occurr)
+
+habitat$prop_name_occurr<-100*habitat$count_name_occurr/n
+
+habitat$h[which(habitat$h=="Tropical and subtropical woodlands")]<-"(Sub)tropical woodlands"
+
+habitat$h<-factor(habitat$h, levels=unique(habitat$h))
+
+A<-ggplot(habitat, aes())+
+    geom_bar(aes(y=h, x=prop_name_occurr), stat="identity", fill="#206431", colour=NA)+
+    xlab("Participants (%)")+
+    ylab("")+
+    theme_minimal()+
+    theme(axis.title.x = element_text(size=9, margin=margin(t=6)),
+          axis.text=element_text(size=8))
+```
+
+### Panel B: Soil sampling depth
+
+```{r}
+rooting.depth<-na.omit(data.frame(h=data$`If you use root phenotyping in your current research, to what soil depth do you phenotype roots?`))
+
+rooting.depth$x<-""
+
+B<-ggplot(rooting.depth, aes(y=-h, x=x))+
+    geom_violin(fill="#206431", colour=NA, alpha=0.5)+
+    geom_quasirandom(shape=1, color="#206431", size=0.7)+
+    geom_hline(yintercept = -median(rooting.depth$h), linetype=2)+
+    ylab("Soil depth (cm)")+
+    xlab("")+
+    theme_minimal()+
+    theme(axis.title.y = element_text(margin=margin(r=10), size=9),
+          axis.text=element_text(size=8),
+          axis.title.x=element_blank())+
+    scale_y_continuous(breaks=seq(0,-500, by=-50))
+```
+
+### Panel C: Why do you use root phenotyping?
+
+```{r}
+why_future<-na.omit(data$`Why do you plan to use root phenotyping in your future research?`)
+
+n_future<-length(why_future)
+
+why_future<-data.frame(h=sort(unlist(str_split(why_future, pattern=";"))))
+
+why_future<-data.frame(h=str_remove(why_future$h, ".\\(.*"))
+
+why_current<-na.omit(data$`Why do you use root phenotyping in your current research?`)
+
+n_current<-length(why_current)
+
+why_current<-data.frame(h=sort(unlist(str_split(why_current, pattern=";"))))
+
+why_current<-data.frame(h=str_remove(why_current$h, ".\\(.*"))
+
+why_current$time<-"Current research"
+why_future$time<-"Future research"
+
+why<-rbind(why_current, why_future)
+
+why$h[which(why$h=="I have never used root phenotyping"|
+              why$h=="I do not plan to use root phenotyping techniques in my future research")]<-"No plan to use root phenotyping"
+
+why$h[which(why$h=="Quantification of morphological root traits")]<-"Morphological root traits"
+why$h[which(why$h=="Quantification of architectural root traits")]<-"Architectural root traits"
+why$h[which(why$h=="Quantification of physiological root traits")]<-"Physiological root traits"
+why$h[which(why$h=="Quantification of chemical root traits")]<-"Chemical root traits"
+why$h[which(why$h=="Quantification of biotic root traits")]<-"Biotic root traits"
+why$h[which(why$h=="Quantification of anatomical root traits")]<-"Anatomical root traits"
+why$h[which(why$h=="Analysis of plant-associated and rhizosphere microbiomes")]<-"Plant-associated and rhizosphere microbiomes"
+
+why <- why%>% 
+  group_by(h, time) %>% 
+  mutate(count_name_occurr = n()) %>%
+  distinct(.keep_all=TRUE) %>%
+  arrange(count_name_occurr)
+
+why$prop_name_occurr<-NA
+why$prop_name_occurr[why$time=="Current research"]<-100*why$count_name_occurr[why$time=="Current research"]/n_current
+why$prop_name_occurr[why$time=="Future research"]<-100*why$count_name_occurr[why$time=="Future research"]/n_future
+
+why$h<-factor(why$h, levels=unique(why$h))
+
+why<-filter(why, h!="No plan to use root phenotyping")
+why<-filter(why, h!="Other")
+why<-filter(why, h!="Transcriptomics")
+
+C<-ggplot(why)+
+    geom_bar(aes(y=h, x=prop_name_occurr, fill=time), stat="identity", 
+             colour=NA, width=0.8, position=position_dodge(preserve = "single"))+
+    xlab("")+
+    ylab("")+
+    theme_minimal()+
+    theme(axis.title.x = element_blank(),
+          legend.title = element_blank(),
+          legend.position="none",
+          axis.text=element_text(size=8))+
+    scale_fill_viridis_d()
+```
+
+### Panel D: What approaches do you use?
+
+```{r}
+what_current<-na.omit(data$`If you use root phenotyping in your current research, what approaches or techniques do you use?`)
+
+n_current<-length(what_current)
+
+what_current<-data.frame(h=sort(unlist(str_split(what_current, pattern=";"))))
+
+what_current<-data.frame(h=str_remove(what_current$h, ".\\(.*"))
+
+what_current$h[what_current$h=="2D root scanning"]<-"2D root scanning/imaging"
+
+what_future<-na.omit(data$`If you plan to use root phenotyping in your future research, what approaches or techniques will you use?`)
+
+n_future<-length(what_future)
+
+what_future<-data.frame(h=sort(unlist(str_split(what_future, pattern=";"))))
+
+what_future<-data.frame(h=str_remove(what_future$h, ".\\(.*"))
+
+what_future$h[what_future$h=="2D root scanning"]<-"2D root scanning/imaging"
+
+what_current$time<-"Current research"
+what_future$time<-"Future research"
+
+what<-rbind(what_current, what_future)
+
+what$h[which(what$h=="I have never used root phenotyping"|
+               what$h=="I do not plan to use root phenotyping in my future research")]<-"No plan to use root phenotyping"
+
+what <- what %>% 
+  group_by(h, time) %>% 
+  mutate(count_name_occurr = n()) %>%
+  distinct(.keep_all=TRUE) %>%
+  ungroup()%>%
+  complete(h, time, fill = list(count_name_occurr = 0))%>%
+  arrange(count_name_occurr) %>%
+  filter(h!="Other" &
+           h!="Low magnetic field digitizing" &
+           h!="Laser ablation tomography" &
+           h!="3D imaging light tomography" &
+           h!="Visual observations" &
+           h!="Trenching" &
+           h!="Targeted proteomics" &
+           h!="Synchrotron X-ray fluorescence" &
+           h!="Stereoscope imaging" &
+           h!="Proteomics" &
+           h!="PET imaging" &
+           h!="Neutron computed tomography" &
+           h!="Microscopy" &
+           h!="Mass spectrometry imaging" &
+           h!="Low energy X-ray imaging" &
+           h!="Isothermal calorimetry" &
+           h!="Fluorometric enzyme assays")
+
+what$h[which(what$h=="Non-destructive analysis of root growth using rhizoboxes or root observation windows")]<-"Rhizoboxes/Root observation windows"
+what$h[which(what$h=="Non-destructive analysis of root growth in the field using minirhizotrons")]<-"Minirhizotrons"
+what$h[which(what$h=="Next generation sequencing-based methods")]<-"NGS-based methods"
+what$h[which(what$h=="Metabolomic fingerprinting and untargeted metabolomics")]<-"Metabolomic fingerprinting/Untargeted metabolomics"
+what$h[which(what$h=="High-throughput phenotyping of ion uptake rates")]<-"Phenotyping of ion uptake rates"
+
+what$prop_name_occurr<-NA
+what$prop_name_occurr[what$time=="Current research"]<-100*what$count_name_occurr[what$time=="Current research"]/n_current
+what$prop_name_occurr[what$time=="Future research"]<-100*what$count_name_occurr[what$time=="Future research"]/n_future
+
+what$h<-factor(what$h, levels=unique(what$h))
+
+what<-filter(what, h!="No plan to use root phenotyping")
+
+D<-ggplot(what)+
+    geom_bar(aes(y=h, x=prop_name_occurr, fill=time), stat="identity", 
+             colour=NA, width=0.8, position=position_dodge(preserve = "single"))+
+    xlab("Participants (%)")+
+    ylab("")+
+    theme_minimal()+
+    theme(axis.title.x = element_text(margin=margin(t=6), size=9),
+          legend.title = element_blank(),
+          legend.position=c(0.8,0.15),
+          legend.text=element_text(size=9),
+          legend.key.size = unit(1, "line"),
+          axis.text=element_text(size=8))+
+    scale_fill_viridis_d()
+```
+
+### Panel E: Image analysis software
+
+```{r}
+software<-na.omit(data$`If your root phenotyping work involves image analysis, what software tool(s) do you use?`)
+
+n<-length(software)
+
+software<-data.frame(h=sort(unlist(str_split(software, pattern=";"))))
+
+software<-data.frame(h=str_remove(software$h, ".\\(.*"))
+
+software <- software%>% 
+  group_by(h) %>% 
+  mutate(count_name_occurr = n())%>%
+  distinct(.keep_all=TRUE) %>%
+  arrange(count_name_occurr)%>%
+  filter(count_name_occurr>6)
+
+software$prop_name_occurr<-100*software$count_name_occurr/n
+
+software$h<-factor(software$h, levels=unique(software$h))
+
+E<-ggplot(software)+
+  geom_bar(aes(y=h, x=prop_name_occurr), stat="identity", fill="#206431", colour=NA)+
+  xlab("Participants (%)")+
+  ylab("")+
+  theme_minimal()+
+  theme(axis.title.x = element_text(size=9, margin=margin(t=6)),
+        axis.text=element_text(size=8))
+```
+
+### Combine panels
+
+```{r Export figure, fig.height=8.27, fig.width=6.69, message=FALSE, warning=FALSE}
+p1<-ggarrange(A,E, ncol=2, nrow=1, labels=c("A","E"), align="h", widths=c(1,1))
+p2<-ggarrange(B,C, ncol=2, nrow=1, align="h", labels=c("B", "C"), widths=c(0.35,1))
+(p<-ggarrange(p1,p2, D, ncol=1, nrow=3, labels=c("","","D"), heights=c(0.3,0.3,0.5)))
+```
+
+### Export high resolution image
+
+```{r}
+#Tiff file
+# ggsave(paste(path, "Main_results_root_phenotyping_survey.tiff", sep="/"), p, 
+#        dpi=1000, compression="lzw", width=17, height=21, units="cm")
+
+#JPG file
+#ggsave(paste(path, "Main_results_root_phenotyping_survey.jpg", sep="/"), p, 
+#       dpi=1000, width=17, height=21, units="cm")
+```
+
+## Figure S3: Career stages of participants
+
+```{r Figure S3, fig.height=3.54, fig.width=5.9, message=FALSE, warning=FALSE}
+career<-na.omit(data$`What is your career stage?`)
+
+n<-length(career)
+
+career<-data.frame(h=career)
+
+career <- career%>% 
+  group_by(h) %>% 
+  mutate(count_name_occurr = n())%>%
+  distinct(.keep_all=TRUE) %>%
+  arrange(count_name_occurr)
+
+career$prop_name_occurr<-100*career$count_name_occurr/n
+
+career$h<-factor(career$h, levels=unique(career$h))
+
+(plot.career<-ggplot(career)+
+              geom_bar(aes(y=h, x=prop_name_occurr), 
+                       stat="identity", fill="#206431", colour=NA)+
+              xlab("Participants (%)")+
+              ylab("")+
+              theme_minimal()+
+              theme(axis.title.x = element_text(margin=margin(t=10))))
+
+#ggsave(paste(path, "Career.jpg", sep="/"), plot.career, dpi=1000,
+#       width=15, height=9, units="cm")
+```
+
+## Figure S4: Plant species used in root phenotyping
+
+```{r Figure S4, fig.height=6.7, fig.width=5.9, message=FALSE, warning=FALSE}
+species<-na.omit(data$`With regard to root phenotyping, what plant species are you studying?`)
+
+n<-length(species)
+
+species<-data.frame(h=sort(unlist(str_split(species, pattern=";"))))
+
+species$h[species$h %in% c("Cowpea","Medicago truncatula", "Chickpea", 
+                           "Lotus japonicus", "Legumes", "Clover",
+                           "White lupin", "White clover", "Pisum sativum", 
+                           "Pigeon pea", "Persian clover", "Peanut", "Medicago",
+                           "Lentil", "Grain legumes", "Alfalfa")]<-"Other legumes"
+
+species$h[species$h %in% c("Perennial ryegrass", "Pearl millet", "Timothy", "Setaria viridis",
+                           "Ryegrass", "Orchard grass", "Finger millet", "Durum wheat",
+                           "Bermudagrass")]<-"Other grasses"
+
+species$h[species$h %in% c("Canola", "Brassicas", "Watercress", "Pennycress", "Oilseed radish",
+                           "Mustard")]<-"Brassicas"
+
+species$h[species$h %in% c("Poplar", "Peach tree", "Citrus trees", "Apple tree")]<-"Tree species (deciduous)"
+
+species$h[species$h %in% c("Vegetables", "Tobacco", "Sunflower", "Plantago erecta", "Phacelia",
+                           "Other", "Morning glory", "Linseed", "Lansium domesticum", "Grapevine",
+                           "Cocoa", "Chicory", "Cassava", "Buckwheat", "Black pepper", "Basil",
+                           "Aubergine", "Amaranth")]<-"Other"
+
+species <- species %>% 
+  group_by(h) %>% 
+  mutate(count_name_occurr = n())%>%
+  distinct(.keep_all=TRUE) %>%
+  arrange(count_name_occurr)
+
+species$prop_name_occurr<-100*species$count_name_occurr/n
+
+species$h<-factor(species$h, levels=unique(species$h))
+
+(plot.species<-ggplot(species)+
+                geom_bar(aes(y=h, x=prop_name_occurr), 
+                         stat="identity", fill="#206431", colour=NA)+
+                xlab("Participants (%)")+
+                ylab("")+
+                theme_minimal()+
+                theme(axis.title.x = element_text(margin=margin(t=10))))
+
+#ggsave(paste(path, "Species.jpg", sep="/"), plot.species, dpi=1000,
+#       width=15, height=17, units="cm")
+```
+
+## Figure S5: Growing conditions
+
+```{r Figure S5, fig.height=5.9, fig.width=5.9, message=FALSE, warning=FALSE}
+n<-nrow(data)
+
+growth.conditions<-na.omit(data.frame(type=c(rep("Gel-based systems", n),
+                                     rep("Filter papers", n),
+                                     rep("Soil-filled pots", n),
+                                     rep("Soil-filled rhizoboxes", n),
+                                     rep("Hydropony", n),
+                                     rep("Aeropony", n),
+                                     rep("Growth chamber", n),
+                                     rep("Ecotron", n),
+                                     rep("Greenhouse", n),
+                                     rep("Outdoor containers", n),
+                                     rep("Field", n)),
+                              x=as.vector(as.matrix(data[,7:17]))))
+
+growth.conditions$type<-factor(growth.conditions$type, levels=unique(growth.conditions$type))
+
+(plot.growing.conditions<-ggplot(growth.conditions)+
+  geom_bar(aes(x=factor(x), y=..prop..*100, group=1), fill="#206431", 
+           colour=NA, width=0.6, position=position_dodge(preserve = "single"))+
+  ylab("Participants (%)")+
+  xlab("")+
+  theme_bw()+
+  facet_wrap(~type)+
+  theme(axis.title.y = element_text(margin=margin(r=10))))
+
+#ggsave(paste(path, "Growth_conditions.jpg", sep="/"), plot.growing.conditions, dpi=1000,
+#       width=15, height=15, units="cm")
+```
+
+## Figure S6: Why do you use root phenotyping? (ALL)
+
+```{r Figure S6, fig.height=5.5, fig.width=6.3, message=FALSE, warning=FALSE}
+why_future<-na.omit(data$`Why do you plan to use root phenotyping in your future research?`)
+
+n_future<-length(why_future)
+
+why_future<-data.frame(h=sort(unlist(str_split(why_future, pattern=";"))))
+
+why_future<-data.frame(h=str_remove(why_future$h, ".\\(.*"))
+
+why_current<-na.omit(data$`Why do you use root phenotyping in your current research?`)
+
+n_current<-length(why_current)
+
+why_current<-data.frame(h=sort(unlist(str_split(why_current, pattern=";"))))
+
+why_current<-data.frame(h=str_remove(why_current$h, ".\\(.*"))
+
+why_current$time<-"Current research"
+why_future$time<-"Future research"
+
+why<-rbind(why_current, why_future)
+
+why$h[which(why$h=="I have never used root phenotyping"|
+              why$h=="I do not plan to use root phenotyping techniques in my future research")]<-"No plan to use root phenotyping"
+
+why$h[which(why$h=="Quantification of morphological root traits")]<-"Morphological root traits"
+why$h[which(why$h=="Quantification of architectural root traits")]<-"Architectural root traits"
+why$h[which(why$h=="Quantification of physiological root traits")]<-"Physiological root traits"
+why$h[which(why$h=="Quantification of chemical root traits")]<-"Chemical root traits"
+why$h[which(why$h=="Quantification of biotic root traits")]<-"Biotic root traits"
+why$h[which(why$h=="Quantification of anatomical root traits")]<-"Anatomical root traits"
+why$h[which(why$h=="Analysis of plant-associated and rhizosphere microbiomes")]<-"Plant-associated and rhizosphere microbiomes"
+
+why <- why%>% 
+  group_by(h, time) %>% 
+  mutate(count_name_occurr = n()) %>%
+  distinct(.keep_all=TRUE) %>%
+  arrange(count_name_occurr)
+
+why$prop_name_occurr<-NA
+why$prop_name_occurr[why$time=="Current research"]<-100*why$count_name_occurr[why$time=="Current research"]/n_current
+why$prop_name_occurr[why$time=="Future research"]<-100*why$count_name_occurr[why$time=="Future research"]/n_future
+
+why$h<-factor(why$h, levels=unique(why$h))
+
+(C.all<-ggplot(why)+
+    geom_bar(aes(y=h, x=prop_name_occurr, fill=time), stat="identity", 
+             colour=NA, width=0.8, position=position_dodge(preserve = "single"))+
+    xlab("Participants (%)")+
+    ylab("")+
+    theme_minimal()+
+    theme(legend.title = element_blank(),
+          legend.position=c(0.8,0.1),
+          axis.title.x=element_text(margin=margin(t=10)))+
+    scale_fill_viridis_d())
+
+#ggsave(paste(path, "why_ALL.jpg", sep="/"), C.all, dpi=1000,
+#       width=16, height=14, units="cm")
+```
+
+## Figure S7: What approaches do you use? (ALL)
+
+```{r Figure S7, fig.height=8.3, fig.width=7.1, message=FALSE, warning=FALSE}
+what_current<-na.omit(data$`If you use root phenotyping in your current research, what approaches or techniques do you use?`)
+
+n_current<-length(what_current)
+
+what_current<-data.frame(h=sort(unlist(str_split(what_current, pattern=";"))))
+
+what_current<-data.frame(h=str_remove(what_current$h, ".\\(.*"))
+
+what_current$h[what_current$h=="2D root scanning"]<-"2D root scanning/imaging"
+
+what_future<-na.omit(data$`If you plan to use root phenotyping in your future research, what approaches or techniques will you use?`)
+
+n_future<-length(what_future)
+
+what_future<-data.frame(h=sort(unlist(str_split(what_future, pattern=";"))))
+
+what_future<-data.frame(h=str_remove(what_future$h, ".\\(.*"))
+
+what_future$h[what_future$h=="2D root scanning"]<-"2D root scanning/imaging"
+
+what_current$time<-"Current research"
+what_future$time<-"Future research"
+
+what<-rbind(what_current, what_future)
+
+what$h[which(what$h=="I have never used root phenotyping"|
+               what$h=="I do not plan to use root phenotyping in my future research")]<-"No plan to use root phenotyping"
+
+what <- what %>% 
+  group_by(h, time) %>% 
+  mutate(count_name_occurr = n()) %>%
+  distinct(.keep_all=TRUE) %>%
+  ungroup()%>%
+  complete(h, time, fill = list(count_name_occurr = 0))%>%
+  arrange(count_name_occurr)
+
+what$h[which(what$h=="Non-destructive analysis of root growth using rhizoboxes or root observation windows")]<-"Rhizoboxes/Root observation windows"
+what$h[which(what$h=="Non-destructive analysis of root growth in the field using minirhizotrons")]<-"Minirhizotrons"
+what$h[which(what$h=="Next generation sequencing-based methods")]<-"NGS-based methods"
+what$h[which(what$h=="Metabolomic fingerprinting and untargeted metabolomics")]<-"Metabolomic fingerprinting/Untargeted metabolomics"
+what$h[which(what$h=="High-throughput phenotyping of ion uptake rates")]<-"Phenotyping of ion uptake rates"
+
+what$prop_name_occurr<-NA
+what$prop_name_occurr[what$time=="Current research"]<-100*what$count_name_occurr[what$time=="Current research"]/n_current
+what$prop_name_occurr[what$time=="Future research"]<-100*what$count_name_occurr[what$time=="Future research"]/n_future
+
+what$h<-factor(what$h, levels=unique(what$h))
+
+(D.all<-ggplot(what)+
+    geom_bar(aes(y=h, x=prop_name_occurr, fill=time), stat="identity", 
+             colour=NA, width=0.8, position=position_dodge(preserve = "single"))+
+    xlab("Participants (%)")+
+    ylab("")+
+    theme_minimal()+
+    theme(axis.title.x = element_text(margin=margin(t=10)),
+          legend.title = element_blank(),
+          legend.position=c(0.8,0.07))+
+    scale_fill_viridis_d())
+
+#ggsave(paste(path, "what_ALL.jpg", sep="/"), D.all, dpi=1000,
+#       width=18, height=21, units="cm")
+```
+
+## Figure S8: Image analysis software (ALL)
+
+```{r Figure S8, fig.height=9, fig.width=5.1, message=FALSE, warning=FALSE}
+software<-na.omit(data$`If your root phenotyping work involves image analysis, what software tool(s) do you use?`)
+
+n<-length(software)
+
+software<-data.frame(h=sort(unlist(str_split(software, pattern=";"))))
+
+software<-data.frame(h=str_remove(software$h, ".\\(.*"))
+
+software <- software%>% 
+  group_by(h) %>% 
+  mutate(count_name_occurr = n())%>%
+  distinct(.keep_all=TRUE) %>%
+  arrange(count_name_occurr)
+
+software$prop_name_occurr<-100*software$count_name_occurr/n
+
+software$h<-factor(software$h, levels=unique(software$h))
+
+(E.all<-ggplot(software)+
+  geom_bar(aes(y=h, x=prop_name_occurr), stat="identity", 
+           fill="#206431", colour=NA)+
+  xlab("Participants (%)")+
+  ylab("")+
+  theme_minimal()+
+  theme(axis.title.x = element_text(margin=margin(t=10))))
+
+#ggsave(paste(path, "software_ALL.jpg", sep="/"), E.all, dpi=1000,
+#       width=13, height=23, units="cm")
+```
+
+## Figure S9: Limitations and challenges
+
+```{r Figure S9, fig.height=5.9, fig.width=7.9, message=FALSE, warning=FALSE}
+challenges<-na.omit(data$`If you use root phenotyping in your current research, what are the limitations and/or challenges you face?`)
+
+n<-length(challenges)
+
+challenges<-data.frame(h=sort(unlist(str_split(challenges, pattern=";"))))
+
+challenges<-data.frame(h=str_remove(challenges$h, ".\\(.*"))
+
+challenges <- challenges%>% 
+  group_by(h) %>% 
+  mutate(count_name_occurr = n())%>%
+  distinct(.keep_all=TRUE) %>%
+  arrange(count_name_occurr)
+
+challenges$prop_name_occurr<-100*challenges$count_name_occurr/n
+
+challenges$h<-factor(challenges$h, levels=unique(challenges$h))
+
+(plot.challenges<-ggplot(challenges)+
+                    geom_bar(aes(y=h, x=prop_name_occurr), 
+                             stat="identity", fill="#206431", colour=NA)+
+                    xlab("Participants (%)")+
+                    ylab("")+
+                    theme_minimal()+
+                    theme(axis.title.x = element_text(margin=margin(t=10))))
+
+#ggsave(paste(path, "challenges_ALL.jpg", sep="/"), plot.challenges, 
+#        dpi=1000, width=20, height=15, units="cm")
+```
+
+## Figure S10: Plant modelling
+
+```{r Figure S10, fig.height=4.33, fig.width=4.33, message=FALSE, warning=FALSE}
+models<-na.omit(data$`If you use plant modelling in your current research, what model(s) do you use?`)
+
+n<-length(models)
+
+models<-data.frame(h=sort(unlist(str_split(models, pattern=";"))))
+
+models <- models%>% 
+  group_by(h) %>% 
+  mutate(count_name_occurr = n())%>%
+  distinct(.keep_all=TRUE) %>%
+  arrange(count_name_occurr)
+
+models$prop_name_occurr<-100*models$count_name_occurr/n
+
+models$h<-factor(models$h, levels=unique(models$h))
+
+(plot.models<-ggplot(models)+
+  geom_bar(aes(y=h, x=prop_name_occurr), 
+           stat="identity", fill="#206431", colour=NA)+
+  xlab("Participants (%)")+
+  ylab("")+
+  theme_minimal()+
+  theme(axis.title.x = element_text(margin=margin(t=10))))
+
+#ggsave(paste(path, "models_ALL.jpg", sep="/"), plot.models, 
+#        dpi=1000, width=11, height=11, units="cm")
+```
+
