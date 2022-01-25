@@ -1,7 +1,7 @@
 ---
 title: "Analysis_root_phenotyping_survey"
 author: "Benjamin Delory"
-date: "31/07/2021"
+date: "25/01/2022"
 output: 
   html_document:
     toc: TRUE
@@ -23,16 +23,89 @@ library(readxl)
 library(tidyverse)
 library(ggbeeswarm)
 library(ggpubr)
+library(maps)
+library(viridis)
 ```
 
 ## Load survey data
 
 ```{r}
-path<-"C:/Users/Delory/Documents/Postdoc/Conferences/ISRR_2021/Ambassador program"
+path<-"C:/Users/Delory/Documents/GitHub/ISRR_meeting_report_data"
 data <- read_excel(paste(path, "Root phenotyping survey.xlsx", sep="/"))
 ```
 
-## Create summary figure for New Phytologist report
+## Relevance of root phenotyping for survey participants
+
+```{r}
+#"High relevance" was defined as a score larger or equal to 8/10
+
+score<-8
+
+current<-100*nrow(filter(data,
+                         `How relevant is root phenotyping to your current research?`>=score))/nrow(data)
+
+future<-100*nrow(filter(data,
+                        `How relevant will root phenotyping be to your future research?`>=score))/nrow(data)
+
+print(paste(round(current), "% of participants consider that root phenotyping is highly relevant to their current research", sep=""))
+
+print(paste(round(future), "% of participants consider that root phenotyping will be highly relevant to their future research", sep=""))
+```
+
+## Create Figure 2 (world map)
+
+```{r fig.height=3.26, fig.width=7.09, message=FALSE, warning=FALSE}
+countries<-na.omit(data$`In which country do you work?`)
+
+countries<-countries[-which(countries=="m")]
+
+n<-length(countries)
+
+countries<-data.frame(h=sort(unlist(str_split(countries, pattern=";"))))
+
+countries <- countries %>% 
+  group_by(h) %>% 
+  mutate(count_name_occurr = n()) %>%
+  distinct(.keep_all=TRUE) %>%
+  arrange(count_name_occurr)
+
+countries$prop_name_occurr<-100*countries$count_name_occurr/n
+
+world_map <- map_data("world")
+
+country.maps <- map_data("world", region = countries$h)
+
+data(world.cities)
+
+world.cities <- filter(world.cities, capital==1)
+
+world.cities$n<-countries$count_name_occurr[match(world.cities$country.etc, countries$h)]
+country.maps$n<-countries$count_name_occurr[match(country.maps$region, countries$h)]
+
+world.cities<-na.omit(world.cities)
+
+(map<-ggplot(world.cities, aes(x = long, y = lat)) +
+    geom_polygon(data=world_map, mapping=aes(x = long, y = lat, group = group), 
+                 fill="lightgray", colour = "darkgray", inherit.aes = F, size=0.1)+
+    theme_bw()+
+    geom_point(aes(size = n, colour=n), alpha=0.8)+
+    scale_size_continuous(range=c(1,7), name="Number\nof\nparticipants")+
+    scale_colour_viridis(guide="legend", name="Number\nof\nparticipants", direction = 1)+
+    theme(legend.title.align = 0.5,
+          legend.title = element_text(size=9),
+          legend.text = element_text(size=9, color="black"),
+          axis.text = element_text(colour="black",size=8),
+          axis.title = element_text(colour="black", size=9))+
+    xlab("Longitude (°)")+
+    ylab("Latitude (°)")+
+    scale_x_continuous(limits=c(-180, 180), breaks=c(-180,-90,0,90,180), expand=c(0,0))+
+    scale_y_continuous(limits=c(-90,90), breaks=c(-90,-45,0,45,90), expand=c(0,0))+
+    coord_fixed())
+
+#ggsave(paste(path, "Figure2.jpg", sep="/"), map, dpi=1000, width=18, height=17/2.05, units="cm")
+```
+
+## Create summary figure for New Phytologist letter (Figure 3)
 
 ### Panel A: Ecological habitats
 
@@ -269,9 +342,9 @@ E<-ggplot(software)+
 ### Combine panels
 
 ```{r Export figure, fig.height=8.27, fig.width=6.69, message=FALSE, warning=FALSE}
-p1<-ggarrange(A,E, ncol=2, nrow=1, labels=c("A","E"), align="h", widths=c(1,1))
-p2<-ggarrange(B,C, ncol=2, nrow=1, align="h", labels=c("B", "C"), widths=c(0.35,1))
-(p<-ggarrange(p1,p2, D, ncol=1, nrow=3, labels=c("","","D"), heights=c(0.3,0.3,0.5)))
+p1<-ggarrange(A,E, ncol=2, nrow=1, labels=c("(a)","(e)"), align="h", widths=c(1,1))
+p2<-ggarrange(B,C, ncol=2, nrow=1, align="h", labels=c("(b)", "(c)"), widths=c(0.35,1))
+(p<-ggarrange(p1,p2, D, ncol=1, nrow=3, labels=c("","","(d)"), heights=c(0.3,0.3,0.5)))
 ```
 
 ### Export high resolution image
@@ -282,8 +355,7 @@ p2<-ggarrange(B,C, ncol=2, nrow=1, align="h", labels=c("B", "C"), widths=c(0.35,
 #        dpi=1000, compression="lzw", width=17, height=21, units="cm")
 
 #JPG file
-#ggsave(paste(path, "Main_results_root_phenotyping_survey.jpg", sep="/"), p, 
-#       dpi=1000, width=17, height=21, units="cm")
+#ggsave(paste(path, "Figure3.jpg", sep="/"), p, dpi=800, width=17, height=21, units="cm")
 ```
 
 ## Figure S3: Career stages of participants
